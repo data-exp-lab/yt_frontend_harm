@@ -161,7 +161,7 @@ class IHarmDataset(Dataset):
     _field_info_class = IHarmFieldInfo
     _dataset_type = "iharm"
     _metric_type = None
-    _metric_params = {}
+    _metric_params = None
     _grid_filename = None
 
     _x1_info = [0.0, 1.0, 128]
@@ -213,24 +213,14 @@ class IHarmDataset(Dataset):
         Returns array of three 2D tuples corresponding to extent of
         boundary for this file.
         """
-        header = self._handle["header"]
-        N1 = header["n1"][()]
-        N2 = header["n2"][()]
-        N3 = header["n3"][()]
-        x1left = header["geom"]["startx1"][()]
-        x2left = header["geom"]["startx2"][()]
-        x3left = header["geom"]["startx3"][()]
-        dx1 = header["geom"]["dx1"][()]
-        dx2 = header["geom"]["dx2"][()]
-        dx3 = header["geom"]["dx3"][()]
-        x1right = x1left + N1 * dx1
-        x2right = x2left + N2 * dx2
-        x3right = x3left + N3 * dx3
-        return (
-            np.array([x1left, x1right]),
-            np.array([x2left, x2right]),
-            np.array([x3left, x3right]),
+        dds = np.array(
+            [self._geom_params[f"dx{i + 1}"] for i in range(3)], dtype="float64"
         )
+        LE = np.array(
+            [self._geom_params[f"startx{i + 1}"] for i in range(3)], dtype="float64"
+        )
+        RE = LE + self.domain_dimensions * dds
+        return np.vstack((LE, RE)).T
 
     def _map_coordinates(self, X1, X2, X3, metric=None):
         """
@@ -262,32 +252,36 @@ class IHarmDataset(Dataset):
 
         # get geometry
         self._metric_type = header["metric"][()].decode("ascii", "ignore")
-        if self._metric_type == "MKS":
+        if self._metric_type.endswith("MKS"):
             self.geometry = "spherical"
-            self._metric_params["hslope"] = header["geom"]["mks"]["hslope"][()]
-        elif self._metric_type == "MMKS":
-            self.geometry = "cartesian"  # ?
+            self._metric_params = {
+                os.path.basename(param.name): param[()]
+                for param in header["geom"][self._metric_type.lower()].values()
+            }
         else:
             raise NotImplementedError
 
+        self._geom_params = {}
+        for key in ("dx1", "dx2", "dx3", "startx1", "startx2", "startx3"):
+            self._geom_params[key] = header["geom"][key][()]
+        self.domain_dimensions = np.array(
+            [header[key][()] for key in ("n1", "n2", "n3")], dtype="int64"
+        )
+
         # get and set grid dimensions
-        N1 = header["n1"][()]
-        N2 = header["n2"][()]
-        N3 = header["n3"][()]
         X1, X2, X3 = self._get_boundaries()
-        self._x1_info = [X1[0], X1[1], N1]
-        self._x2_info = [X2[0], X2[1], N2]
-        self._x3_info = [X3[0], X3[1], N3]
+        self._x1_info = [X1[0], X1[1], self.domain_dimensions[0]]
+        self._x2_info = [X2[0], X2[1], self.domain_dimensions[1]]
+        self._x3_info = [X3[0], X3[1], self.domain_dimensions[2]]
         (X1m, X2m, X3m) = self._map_coordinates(X1, X2, X3)
         self.domain_left_edge = np.array([X1m[0], X2m[0], X3m[0]], dtype="float64")
         self.domain_right_edge = np.array([X1m[1], X2m[1], X3m[1]], dtype="float64")
         self.domain_width = self.domain_right_edge - self.domain_left_edge
-        self.domain_dimensions = np.array([N1, N2, N3], dtype="int64")
 
         # set fields directly in the field
         i = 0
         self._field_map = {}
-        for name in header["prim_names"][0]:
+        for name in header["prim_names"]:
             self._field_map[name.decode("ascii", "ignore")] = ("prims", i)
 
         # TODO add jcon, other fields of interest?
