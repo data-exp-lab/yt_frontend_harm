@@ -287,9 +287,7 @@ class IHarmDataset(Dataset):
         # TODO add jcon, other fields of interest?
 
         self.refine_by = 1  # should this be zero?
-
         self.dimensionality = 3  # TODO figure out how many of the N's are 1
-
         self.field_ordering = "fortran"
 
         # not a cosmological simulation, so default the following to zero

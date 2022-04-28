@@ -5,17 +5,16 @@ Skeleton-specific IO functions
 
 """
 
-#-----------------------------------------------------------------------------
+# -----------------------------------------------------------------------------
 # Copyright (c) 2013, yt Development Team.
 #
 # Distributed under the terms of the Modified BSD License.
 #
 # The full license is in the file COPYING.txt, distributed with this software.
-#-----------------------------------------------------------------------------
+# -----------------------------------------------------------------------------
 
 import numpy as np
-from yt.utilities.io_handler import \
-    BaseIOHandler
+from yt.utilities.io_handler import BaseIOHandler
 
 
 class IHarmIOHandler(BaseIOHandler):
@@ -44,29 +43,27 @@ class IHarmIOHandler(BaseIOHandler):
         # np_array.swapaxes(0,2)).
 
         chunks = list(chunks)
-        if any((ftype != "iharm" for ftype,_ in fields)):
+        if any((ftype != "iharm" for ftype, _ in fields)):
             raise NotImplementedError
 
         rv = {}
         for field in fields:
-            rv[field] = np.empty(size, dtype='=f8')
-        
+            rv[field] = np.empty(size, dtype="=f8")
+
         for field in fields:
             t = self.ds._field_map[field[1]]
-            ds = self.ds._handle['/' + t[0]]
+            ds = self.ds._handle["/" + t[0]]
             ind = 0
             for chunk in chunks:
                 for mesh in chunk.objs:
-                    data = ds[:,:,:,t[1]]
+                    data = ds[:, :, :, t[1]]
                     ind += mesh.select(selector, data, rv[field], ind)
 
         return rv
 
-
-
     def _read_chunk_data(self, chunk, fields):
         # TODO
-        
+
         f = self._handle
         rv = {}
         for g in chunk.objs:
@@ -76,4 +73,3 @@ class IHarmIOHandler(BaseIOHandler):
         print("call to chunk data")
 
         return rv
-
